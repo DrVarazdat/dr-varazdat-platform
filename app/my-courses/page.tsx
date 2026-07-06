@@ -67,13 +67,43 @@ export default function MyCourses() {
                   </span>
                 </div>
                 
-                {course.status === "Approved" ? (
-                  <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-                    <CheckCircle size={16} /> Enrollment Confirmed. Check your email for syllabus details.
-                  </div>
-                ) : (
+                {/* STATUS MESSAGES */}
+                {course.status === "Pending" && (
                   <div className="flex items-center gap-2 text-sm text-yellow-600 font-medium">
                     <Clock size={16} /> Pending Admin Approval.
+                  </div>
+                )}
+                {course.status === "Rejected" && (
+                  <div className="flex items-center gap-2 text-sm text-red-600 font-medium">
+                    Application Denied. Please contact support.
+                  </div>
+                )}
+                {course.status === "Awaiting Payment" && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-sm text-blue-600 font-medium">
+                      <CheckCircle size={16} /> Approved! Please complete payment to secure your seat.
+                    </div>
+                    {/* Simulated Payment Button */}
+                    <button 
+                      onClick={async () => {
+                        await supabase.from("requests").update({ status: "Enrolled" }).eq("id", course.id);
+                        window.location.reload(); // Refresh to show Enrolled state!
+                      }}
+                      className="w-full py-2 bg-navy text-white rounded-md text-sm font-bold hover:bg-navy-dark transition-colors"
+                    >
+                      Pay via Secure Gateway
+                    </button>
+                  </div>
+                )}
+                {course.status === "Enrolled" && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                      <CheckCircle size={16} /> Enrollment Confirmed!
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-black/5 text-sm text-gray-700 dark:text-gray-300">
+                      <strong>Next Class:</strong> Tuesday at 10:00 AM<br/>
+                      <strong>Location:</strong> Zoom Link sent to email.
+                    </div>
                   </div>
                 )}
               </div>
