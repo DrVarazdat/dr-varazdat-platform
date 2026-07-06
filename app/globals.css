@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-navy: #1e3a8a;
+  --color-navy-dark: #172554;
+  --color-darkBg: #050505;
+}
+
+@layer base {
+  body { @apply bg-neutral-50 text-gray-900 transition-colors duration-300; }
+  .dark body { @apply bg-darkBg text-white; }
+}
+html { scroll-behavior: smooth; }
