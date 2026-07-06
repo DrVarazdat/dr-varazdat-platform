@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { BookOpen, Calendar, Plus, Trash2, Users, CheckCircle, Video, Mic, FileText, LayoutDashboard, UserCircle, Save, Briefcase, GraduationCap, Loader2, Edit, Brain, Sparkles, Paperclip, Download } from "lucide-react";
+import { BookOpen, Calendar, Plus, Trash2, Users, CheckCircle, Video, Mic, FileText, LayoutDashboard, UserCircle, Save, Briefcase, GraduationCap, Loader2, Edit, Brain, Sparkles, Paperclip, Download, Image as ImageIcon } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminDashboard() {
@@ -13,6 +13,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [fetchingYoutube, setFetchingYoutube] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  
+  // NEW: State for Home & Profile Image Uploads
+  const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [aboutData, setAboutData] = useState({ title: "", description: "", image_url: "" });
@@ -68,12 +72,31 @@ export default function AdminDashboard() {
     checkSecurity();
   }, [activeTab]);
 
+  // UPDATED: Now uploads the images directly to Supabase!
   const handleSaveAbout = async () => {
     setLoading(true);
-    await supabase.from("site_content").upsert({ id: "about_bio", ...aboutData });
-    await supabase.from("site_content").upsert({ id: "home_hero", ...heroData });
-    alert("Page Headers Updated Successfully!");
-    setLoading(false);
+    let finalHeroUrl = heroData.image_url;
+    let finalProfileUrl = aboutData.image_url;
+
+    if (heroImageFile) {
+      const fileName = `hero_${Math.random()}.${heroImageFile.name.split('.').pop()}`;
+      await supabase.storage.from('images').upload(fileName, heroImageFile);
+      finalHeroUrl = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
+    }
+
+    if (profileImageFile) {
+      const fileName = `profile_${Math.random()}.${profileImageFile.name.split('.').pop()}`;
+      await supabase.storage.from('images').upload(fileName, profileImageFile);
+      finalProfileUrl = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
+    }
+
+    await supabase.from("site_content").upsert({ id: "about_bio", title: aboutData.title, description: aboutData.description, image_url: finalProfileUrl });
+    await supabase.from("site_content").upsert({ id: "home_hero", title: heroData.title, description: heroData.description, image_url: finalHeroUrl });
+    
+    setHeroImageFile(null);
+    setProfileImageFile(null);
+    alert("Page Headers & Images Updated Successfully!");
+    fetchData();
   };
 
   const handleDelete = async (id: string) => {
@@ -146,6 +169,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] bg-gray-50 dark:bg-[#020202]">
+      
       <div className="w-64 border-r border-black/10 dark:border-white/10 bg-white dark:bg-[#050505] p-6 hidden md:block overflow-y-auto">
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Admin Panel</h2>
         <nav className="flex flex-col gap-2">
@@ -184,6 +208,7 @@ export default function AdminDashboard() {
            </div>
         )}
 
+        {/* UPDATED: ABOUT PAGE EDITOR WITH FILE UPLOADS */}
         {activeTab === "about" && (
           <div className="space-y-8 max-w-3xl">
             <div className="bg-white dark:bg-[#0a0a0a] border border-black/10 dark:border-white/10 rounded-2xl p-8 shadow-sm">
@@ -191,7 +216,20 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Main Title (Last 2 words turn blue)</label><input type="text" value={heroData.title} onChange={e => setHeroData({...heroData, title: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy" /></div>
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Short Description</label><textarea rows={3} value={heroData.description} onChange={e => setHeroData({...heroData, description: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy"></textarea></div>
-                <div><label className="block text-sm font-medium mb-2 text-gray-500">Home Image URL</label><input type="text" value={heroData.image_url} onChange={e => setHeroData({...heroData, image_url: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy" /></div>
+                
+                {/* NEW FILE UPLOAD FOR HOME IMAGE */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-500">Home Image</label>
+                  <div className="w-full p-4 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-gray-50 dark:bg-white/5 text-center">
+                    <input type="file" id="hero-img-upload" accept="image/*" className="hidden" onChange={(e) => setHeroImageFile(e.target.files ? e.target.files[0] : null)} />
+                    <label htmlFor="hero-img-upload" className="cursor-pointer flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-navy transition-colors">
+                      <ImageIcon size={24} />
+                      <span className="text-sm font-medium">{heroImageFile ? heroImageFile.name : "Click to upload a new Image"}</span>
+                    </label>
+                  </div>
+                  {heroData.image_url && !heroImageFile && <p className="text-xs text-green-500 mt-2">Current image is active.</p>}
+                </div>
+
               </div>
             </div>
 
@@ -200,14 +238,31 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Name / Title</label><input type="text" value={aboutData.title} onChange={e => setAboutData({...aboutData, title: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy" /></div>
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Biography</label><textarea rows={4} value={aboutData.description} onChange={e => setAboutData({...aboutData, description: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy"></textarea></div>
-                <div><label className="block text-sm font-medium mb-2 text-gray-500">Profile Image URL</label><input type="text" value={aboutData.image_url} onChange={e => setAboutData({...aboutData, image_url: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy" /></div>
+                
+                {/* NEW FILE UPLOAD FOR PROFILE IMAGE */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-500">Profile Image</label>
+                  <div className="w-full p-4 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-gray-50 dark:bg-white/5 text-center">
+                    <input type="file" id="profile-img-upload" accept="image/*" className="hidden" onChange={(e) => setProfileImageFile(e.target.files ? e.target.files[0] : null)} />
+                    <label htmlFor="profile-img-upload" className="cursor-pointer flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-navy transition-colors">
+                      <ImageIcon size={24} />
+                      <span className="text-sm font-medium">{profileImageFile ? profileImageFile.name : "Click to upload a new Headshot"}</span>
+                    </label>
+                  </div>
+                  {aboutData.image_url && !profileImageFile && <p className="text-xs text-green-500 mt-2">Current image is active.</p>}
+                </div>
+
               </div>
             </div>
 
-            <button onClick={handleSaveAbout} disabled={loading} className="w-full flex justify-center items-center gap-2 bg-navy text-white px-6 py-4 rounded-xl font-bold hover:bg-navy-dark transition-colors shadow-lg"><Save size={18} /> {loading ? "Saving..." : "Save All Page Changes"}</button>
+            <button onClick={handleSaveAbout} disabled={loading} className="w-full flex justify-center items-center gap-2 bg-navy text-white px-6 py-4 rounded-xl font-bold hover:bg-navy-dark transition-colors shadow-lg">
+              {loading && <Loader2 size={18} className="animate-spin" />}
+              {loading ? "Uploading & Saving..." : <><Save size={18} /> Save All Page Changes</>}
+            </button>
           </div>
         )}
 
+        {/* ... (Data Tables remain the same) ... */}
         {activeTab !== "about" && activeTab !== "ai_generator" && (
           <>
             <div className="flex justify-between items-center mb-8">
@@ -240,7 +295,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* DYNAMIC MODAL */}
+      {/* DYNAMIC MODAL (unchanged) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-[#0a0a0a] border border-black/10 dark:border-white/10 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
