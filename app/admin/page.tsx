@@ -14,7 +14,7 @@ export default function AdminDashboard() {
   const [fetchingYoutube, setFetchingYoutube] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   
-  // NEW: State for Home & Profile Image Uploads
+  // State for Home & Profile Image Uploads
   const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -72,7 +72,6 @@ export default function AdminDashboard() {
     checkSecurity();
   }, [activeTab]);
 
-  // UPDATED: Now uploads the images directly to Supabase!
   const handleSaveAbout = async () => {
     setLoading(true);
     let finalHeroUrl = heroData.image_url;
@@ -81,13 +80,15 @@ export default function AdminDashboard() {
     if (heroImageFile) {
       const fileName = `hero_${Math.random()}.${heroImageFile.name.split('.').pop()}`;
       await supabase.storage.from('images').upload(fileName, heroImageFile);
-      finalHeroUrl = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+      finalHeroUrl = data.publicUrl;
     }
 
     if (profileImageFile) {
       const fileName = `profile_${Math.random()}.${profileImageFile.name.split('.').pop()}`;
       await supabase.storage.from('images').upload(fileName, profileImageFile);
-      finalProfileUrl = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+      finalProfileUrl = data.publicUrl;
     }
 
     await supabase.from("site_content").upsert({ id: "about_bio", title: aboutData.title, description: aboutData.description, image_url: finalProfileUrl });
@@ -106,6 +107,16 @@ export default function AdminDashboard() {
   };
 
   const handleEdit = (row: any) => { setFormData({ ...defaultForm, ...row }); setEditingId(row.id); setIsModalOpen(true); };
+
+  // Student Request Approvals
+  const handleApprove = async (id: string) => {
+    await supabase.from("requests").update({ status: "Awaiting Payment" }).eq("id", id);
+    fetchData(); 
+  };
+  const handleReject = async (id: string) => {
+    await supabase.from("requests").update({ status: "Rejected" }).eq("id", id);
+    fetchData();
+  };
 
   const handleYoutubeUrlChange = async (url: string) => {
     setFormData({ ...formData, youtube_url: url });
@@ -170,6 +181,7 @@ export default function AdminDashboard() {
   return (
     <div className="flex min-h-[calc(100vh-4rem)] bg-gray-50 dark:bg-[#020202]">
       
+      {/* SIDEBAR */}
       <div className="w-64 border-r border-black/10 dark:border-white/10 bg-white dark:bg-[#050505] p-6 hidden md:block overflow-y-auto">
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Admin Panel</h2>
         <nav className="flex flex-col gap-2">
@@ -183,6 +195,7 @@ export default function AdminDashboard() {
 
       <div className="flex-1 p-8 h-[calc(100vh-4rem)] overflow-y-auto">
         
+        {/* AI GENERATOR */}
         {activeTab === "ai_generator" && (
            <div className="max-w-3xl">
              <h1 className="text-3xl font-bold flex items-center gap-3 mb-2"><Sparkles className="text-purple-500" /> AI Content Auto-Generator</h1>
@@ -208,7 +221,7 @@ export default function AdminDashboard() {
            </div>
         )}
 
-        {/* UPDATED: ABOUT PAGE EDITOR WITH FILE UPLOADS */}
+        {/* ABOUT PAGE EDITOR WITH FILE UPLOADS */}
         {activeTab === "about" && (
           <div className="space-y-8 max-w-3xl">
             <div className="bg-white dark:bg-[#0a0a0a] border border-black/10 dark:border-white/10 rounded-2xl p-8 shadow-sm">
@@ -217,7 +230,6 @@ export default function AdminDashboard() {
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Main Title (Last 2 words turn blue)</label><input type="text" value={heroData.title} onChange={e => setHeroData({...heroData, title: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy" /></div>
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Short Description</label><textarea rows={3} value={heroData.description} onChange={e => setHeroData({...heroData, description: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy"></textarea></div>
                 
-                {/* NEW FILE UPLOAD FOR HOME IMAGE */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-500">Home Image</label>
                   <div className="w-full p-4 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-gray-50 dark:bg-white/5 text-center">
@@ -229,7 +241,6 @@ export default function AdminDashboard() {
                   </div>
                   {heroData.image_url && !heroImageFile && <p className="text-xs text-green-500 mt-2">Current image is active.</p>}
                 </div>
-
               </div>
             </div>
 
@@ -239,7 +250,6 @@ export default function AdminDashboard() {
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Name / Title</label><input type="text" value={aboutData.title} onChange={e => setAboutData({...aboutData, title: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy" /></div>
                 <div><label className="block text-sm font-medium mb-2 text-gray-500">Biography</label><textarea rows={4} value={aboutData.description} onChange={e => setAboutData({...aboutData, description: e.target.value})} className="w-full p-4 rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-white/5 outline-none focus:border-navy"></textarea></div>
                 
-                {/* NEW FILE UPLOAD FOR PROFILE IMAGE */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-500">Profile Image</label>
                   <div className="w-full p-4 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-gray-50 dark:bg-white/5 text-center">
@@ -251,7 +261,6 @@ export default function AdminDashboard() {
                   </div>
                   {aboutData.image_url && !profileImageFile && <p className="text-xs text-green-500 mt-2">Current image is active.</p>}
                 </div>
-
               </div>
             </div>
 
@@ -262,7 +271,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ... (Data Tables remain the same) ... */}
+        {/* DATA TABLES */}
         {activeTab !== "about" && activeTab !== "ai_generator" && (
           <>
             <div className="flex justify-between items-center mb-8">
@@ -281,7 +290,12 @@ export default function AdminDashboard() {
                           {activeTab === "ai_knowledge" && row.file_url ? <a href={row.file_url} target="_blank" className="flex items-center gap-1 text-blue-500 hover:underline"><Download size={14}/> {row.file_name}</a> : <>{row.role || row.degree || row.status || row.date || row.tech_stack || row.youtube_id || row.content || "No extra details"}{row.duration || row.years ? ` (${row.duration || row.years})` : ""}</>}
                         </td>
                         <td className="p-4 flex justify-end gap-2">
-                          {activeTab === "requests" && row.status === "Pending" && <button className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs font-bold"><CheckCircle size={14}/> Approve</button>}
+                          {activeTab === "requests" && row.status === "Pending" && (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleApprove(row.id)} className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs font-bold">Approve</button>
+                              <button onClick={() => handleReject(row.id)} className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs font-bold">Reject</button>
+                            </div>
+                          )}
                           {activeTab !== "requests" && <button onClick={() => handleEdit(row)} className="p-2 text-navy hover:text-navy-dark transition-colors"><Edit size={16} /></button>}
                           <button onClick={() => handleDelete(row.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
                         </td>
@@ -295,7 +309,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* DYNAMIC MODAL (unchanged) */}
+      {/* DYNAMIC MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-[#0a0a0a] border border-black/10 dark:border-white/10 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
