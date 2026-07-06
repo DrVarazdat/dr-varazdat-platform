@@ -17,7 +17,7 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [activeLang, setActiveLang] = useState("EN")
+  const [activeLang, setActiveLang] = useState(i18n.language ? i18n.language.toUpperCase() : "EN");
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
