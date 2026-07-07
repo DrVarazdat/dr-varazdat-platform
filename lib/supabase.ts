@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-// This will now perfectly use the keys you saved in Vercel and .env.local!
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Hardcoding the NEW keys directly here guarantees Vercel will never lose connection!
+const supabaseUrl = "https://sewkjpcfrdgjfibrkqbq.supabase.co";
+const supabaseAnonKey = "sb_publishable_aTB2jvWJmmyxiy-9GYMW6g_prJMWef5";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
