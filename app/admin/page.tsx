@@ -14,6 +14,9 @@ export default function AdminDashboard() {
   const [fetchingYoutube, setFetchingYoutube] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   
+  // State for AI Generator File Upload
+  const [aiUploadFile, setAiUploadFile] = useState<File | null>(null);
+  
   // State for Home & Profile Image Uploads
   const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
@@ -166,16 +169,62 @@ export default function AdminDashboard() {
     setIsUploading(false); setIsModalOpen(false); setEditingId(null); setUploadFile(null); setFormData(defaultForm); fetchData();
   };
 
-  const handleAIProcess = () => {
-    setAiProcessing(true); setAiStep("Reading document...");
-    setTimeout(() => { setAiStep("Extracting key information via OpenAI...");
-      setTimeout(() => { setAiStep("Formatting data...");
-        setTimeout(() => {
-          setFormData({ ...defaultForm, title: `AI Generated ${aiTarget.replace("_", " ")}`, description: "Automatically extracted from the uploaded document.", price: aiTarget === "courses" ? "$250" : "", date: "TBD", location: "Online", image_url: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=800&q=80" });
-          setActiveTab(aiTarget); setAiProcessing(false); setIsModalOpen(true);
-        }, 1500);
-      }, 1500);
-    }, 1500);
+  const handleAIProcess = async () => {
+    if (!aiUploadFile) {
+      alert("Please select a file first.");
+      return;
+    }
+
+    setAiProcessing(true); 
+    
+    try {
+      // Step 1: Upload to Supabase Storage
+      setAiStep("Uploading file to Supabase...");
+      const fileName = `ai_source_${Date.now()}_${aiUploadFile.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('knowledge_files')
+        .upload(fileName, aiUploadFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get the public URL of the uploaded file
+      const { data: { publicUrl } } = supabase.storage
+        .from('knowledge_files')
+        .getPublicUrl(fileName);
+
+      // Step 2: Send URL to our backend to read PDF and push to Botpress
+      setAiStep("Extracting text and sending to Botpress...");
+      const res = await fetch("/api/process-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl: publicUrl, fileName: aiUploadFile.name })
+      });
+
+      if (!res.ok) throw new Error("Failed to process document");
+
+      // Step 3: Format the data for the UI Modal
+      setAiStep("Formatting data...");
+      setFormData({ 
+        ...defaultForm, 
+        title: `AI Generated ${aiTarget.replace("_", " ")}`, 
+        description: "Automatically extracted from the uploaded document.", 
+        price: aiTarget === "courses" ? "$250" : "", 
+        date: "TBD", 
+        location: "Online", 
+        image_url: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=800&q=80" 
+      });
+      
+      setActiveTab(aiTarget); 
+      setIsModalOpen(true);
+      setAiUploadFile(null); // Clear the file input
+
+    } catch (error) {
+      console.error(error);
+      alert("There was an error processing the file.");
+    } finally {
+      setAiProcessing(false);
+    }
   };
 
   return (
@@ -210,8 +259,19 @@ export default function AdminDashboard() {
                <div className="mb-8">
                  <label className="block text-sm font-bold mb-2">2. Provide the Source Material</label>
                  <div className="w-full p-8 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-gray-50 dark:bg-white/5 text-center transition-colors hover:border-navy">
-                   <input type="file" id="ai-file-upload" accept=".pdf,.doc,.docx,.txt" className="hidden" />
-                   <label htmlFor="ai-file-upload" className="cursor-pointer flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-navy transition-colors"><Paperclip size={32} /><span className="font-medium text-lg">Click to upload PDF or Word Doc</span></label>
+                   <input 
+                     type="file" 
+                     id="ai-file-upload" 
+                     accept=".pdf,.doc,.docx,.txt" 
+                     className="hidden" 
+                     onChange={(e) => setAiUploadFile(e.target.files ? e.target.files[0] : null)}
+                   />
+                   <label htmlFor="ai-file-upload" className="cursor-pointer flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-navy transition-colors">
+                     <Paperclip size={32} />
+                     <span className="font-medium text-lg">
+                       {aiUploadFile ? aiUploadFile.name : "Click to upload PDF or Word Doc"}
+                     </span>
+                   </label>
                  </div>
                </div>
                <button onClick={handleAIProcess} disabled={aiProcessing} className="w-full py-4 bg-gradient-to-r from-navy to-purple-600 text-white rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-purple-500/30 flex items-center justify-center gap-3 disabled:opacity-70">
