@@ -2,17 +2,19 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { CheckCircle, Clock, Calendar, MapPin, ChevronDown, Lock } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 
 export default function CourseDetail() {
   const params = useParams();
+  const router = useRouter();
+  
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [openLesson, setOpenLesson] = useState<number | null>(0);
-  const [buttonState, setButtonState] = useState("default");
+  const [buttonState, setButtonState] = useState("default"); // default, pending
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -22,6 +24,35 @@ export default function CourseDetail() {
     };
     fetchCourseDetails();
   }, [params.id]);
+
+  // MAGIC CONNECTION: This sends the request to the database!
+  const handleParticipate = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // If they are not logged in, tell them to log in!
+    if (!session) {
+      alert("Please log in or create an account to participate in this course.");
+      router.push("/login");
+      return;
+    }
+
+    // Change button to yellow "Pending" state
+    setButtonState("pending");
+
+    // Save the request to Supabase!
+    const { error } = await supabase.from("requests").insert([
+      { 
+        user_email: session.user.email, 
+        course_title: course.title, 
+        status: "Pending" 
+      }
+    ]);
+
+    if (error) {
+      alert("Error sending request: " + error.message);
+      setButtonState("default");
+    }
+  };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading Course Details...</div>;
   if (!course) return <div className="min-h-screen flex items-center justify-center">Course not found.</div>;
@@ -47,11 +78,13 @@ export default function CourseDetail() {
           </div>
         </div>
       </div>
+
       <div className="max-w-7xl mx-auto px-6 mt-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2">
             <h2 className="text-2xl font-bold mb-4 border-b border-black/10 dark:border-white/10 pb-2">Course Overview</h2>
             <p className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed whitespace-pre-line">{course.description}</p>
+            
             <h3 className="text-xl font-bold mb-4">Lesson Breakdown</h3>
             <div className="flex flex-col gap-3">
               {lessons.map((lesson, idx) => (
@@ -66,22 +99,32 @@ export default function CourseDetail() {
               ))}
             </div>
           </div>
+
           <div className="relative">
             <div className="sticky top-24 bg-white dark:bg-[#0a0a0a] border border-black/10 dark:border-white/10 rounded-2xl shadow-xl p-6">
               <div className="text-3xl font-bold text-navy dark:text-blue-400 mb-6 pb-6 border-b border-black/10 dark:border-white/10">{course.price}</div>
+              
               <div className="flex flex-col gap-4 mb-8 text-sm">
                 <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300"><Calendar size={18} className="text-navy"/> {course.start_date || "TBD"}</div>
                 <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300"><Clock size={18} className="text-navy"/> {course.duration || "TBD"}</div>
                 <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300"><MapPin size={18} className="text-navy"/> {course.location || "TBD"}</div>
               </div>
+
+              {/* DYNAMIC SMART BUTTON */}
               {course.status === "Upcoming" ? (
                 buttonState === "default" ? (
-                  <button onClick={() => setButtonState("pending")} className="w-full py-4 bg-navy hover:bg-navy-dark text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-navy/30 hover:-translate-y-1">Participate Now</button>
+                  <button onClick={handleParticipate} className="w-full py-4 bg-navy hover:bg-navy-dark text-white rounded-xl font-bold transition-all shadow-lg hover:-translate-y-1">
+                    Participate Now
+                  </button>
                 ) : (
-                  <button disabled className="w-full py-4 bg-yellow-600 text-white rounded-xl font-bold transition-all shadow-inner cursor-not-allowed">⏳ Request Sent (Pending)</button>
+                  <button disabled className="w-full py-4 bg-yellow-600 text-white rounded-xl font-bold transition-all shadow-inner cursor-not-allowed">
+                    ⏳ Request Sent (Pending)
+                  </button>
                 )
               ) : (
-                <button disabled className="w-full py-4 bg-gray-200 dark:bg-gray-800 text-gray-500 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed"><Lock size={18} /> {course.status === "Active Now" ? "Registration Closed" : "Course Archived"}</button>
+                <button disabled className="w-full py-4 bg-gray-200 dark:bg-gray-800 text-gray-500 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+                  <Lock size={18} /> {course.status === "Active Now" ? "Registration Closed" : "Course Archived"}
+                </button>
               )}
             </div>
           </div>
